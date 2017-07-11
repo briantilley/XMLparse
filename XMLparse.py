@@ -10,7 +10,8 @@
 
 import sys
 import re
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as et
+from xml.dom import minidom
 
 # --------------------------------- FUNCTIONS ---------------------------------
 
@@ -64,13 +65,36 @@ def setwise_match(source_root, target_root):
 	# all target children have found friends
 	return True
 
-# match root-level structure
-match_call_counter = 0
-def match_structures(source_root, target_root):
-	global match_call_counter
-	match_call_counter += 1
+# verify whether all attributes from target_node are present and matching in source_node
+# target attribute values are interpreted as regex
+def attribute_subset_match(source_node, target_node):
+	target_size = len(target_node.attrib)
 
-	return (source_root.tag == target_root.tag) and setwise_match(source_root, target_root)
+	if target_size == 0:
+		return True
+
+	if len(source_node.attrib) < target_size:
+		return False
+
+	try:
+		for key in target_node.attrib:
+			# target attribute values surrounded in "re{...}" are interpreted as regex patterns
+			if re.match("re\{.*\}", target_node.attrib[key]):
+				attribute_matches = re.match(target_node.attrib[key][3:-1], source_node.attrib[key])
+			else:
+				attribute_matches = (target_node.attrib[key] == source_node.attrib[key])
+
+			if not attribute_matches:
+				return False
+	except KeyError: # key does not exist in source
+		return False
+
+	return True
+
+# match root-level structure
+def match_structures(source_root, target_root):
+
+	return (source_root.tag == target_root.tag) and attribute_subset_match(source_root, target_root) and setwise_match(source_root, target_root)
 
 # return a list of all first-order children of each element in the provided list
 def one_level_in(parent_list):
@@ -80,50 +104,45 @@ def one_level_in(parent_list):
 			children.append(child)
 	return children
 
-# (breadth-first) seek target structure anywhere within the source
-def exhaustive_match_bfs(source_root, target_root):
-	parent_list = list(source_root)
-	while len(parent_list) > 0:
-		for parent in parent_list:
-			if match_structures(parent, target_root):
-				return True
+# (breadth-first or depth-first) seek target structure anywhere within the source
+def exhaustive_match(source_root, target_root, mode="bfs"):
+	if mode is "bfs":
+		parent_list = list(source_root)
+		while len(parent_list) > 0:
+			for parent in parent_list:
+				if match_structures(parent, target_root):
+					return True
 
-		parent_list = one_level_in(parent_list)
+			parent_list = one_level_in(parent_list)
 
-	return False
-
-# (depth-first) seek target structure anywhere within the source
-def exhaustive_match(source_root, target_root):
-	if match_structures(source_root, target_root):
-		return True
-
-	for child in source_root:
-		if exhaustive_match(child, target_root):
+	elif mode is "dfs":
+		if match_structures(source_root, target_root):
 			return True
 
+		for child in source_root:
+			if exhaustive_match(child, target_root, "dfs"):
+				return True
+
 	return False
 
-# (breadth-first) return the roots of all structures matching the target
-def exhaustive_search_bfs(source_root, target_root):
-	parent_list = list(source_root)
-	match_list = []
+# (breadth-first or depth-first) return the roots of all structures matching the target
+def exhaustive_search(source_root, target_root, mode= "dfs", match_list=[]):
+	if mode == "dfs":
+		if match_structures(source_root, target_root):
+			match_list.append(source_root)
 
-	while len(parent_list) > 0:
-		for parent in parent_list:
-			if match_structures(parent, target_root):
-				match_list.append(parent)
+		for child in source_root:
+			exhaustive_search(child, target_root, "dfs", match_list)
 
-		parent_list = one_level_in(parent_list)
+	elif mode == "bfs":
+		parent_list = list(source_root)
 
-	return match_list
+		while len(parent_list) > 0:
+			for parent in parent_list:
+				if match_structures(parent, target_root):
+					match_list.append(parent)
 
-# (depth-first) return the roots of all structures matching the target
-def exhaustive_search(source_root, target_root, match_list=[]):
-	if match_structures(source_root, target_root):
-		match_list.append(source_root)
-
-	for child in source_root:
-		exhaustive_search(child, target_root, match_list)
+			parent_list = one_level_in(parent_list)
 
 	return match_list
 
@@ -142,21 +161,27 @@ def show_tree(root):
 # process argument and load XML from text
 def get_root_from_arg(arg):
 	if re.match(".*[.].*", arg):
-		return ET.parse(arg).getroot()
-	return ET.fromstring(arg)
+		return et.parse(arg).getroot()
+	return et.fromstring(arg)
+
+# return the XML text equivalent of a tree
+def get_source(node):
+	return minidom.parseString(et.tostring(node, encoding="UTF-8").decode()).toprettyxml()
 
 # --------------------------------- PROCEDURE ---------------------------------
 
-# usage check
-if len(sys.argv) != 3:
-	print("usage:", sys.argv[0], "source_XML target_structure")
-	sys.exit(1)
+if __name__ == "__main__":
 
-# obtain XML trees
-source_root = get_root_from_arg(sys.argv[1])
-target_root = get_root_from_arg(sys.argv[2])
+	# usage check
+	if len(sys.argv) != 3:
+		print("usage:", sys.argv[0], "source_XML target_structure")
+		sys.exit(1)
 
-# obtain all matches present, then print each on its own line
-matches = exhaustive_search(source_root, target_root)
-for match in matches:
-	print(ET.tostring(match, encoding="UTF-8").decode())
+	# obtain XML trees
+	source_root = get_root_from_arg(sys.argv[1])
+	target_root = get_root_from_arg(sys.argv[2])
+
+	# obtain all matches present, then print each on its own line
+	matches = exhaustive_search(source_root, target_root)
+	for match in matches:
+		print(get_source(match))
