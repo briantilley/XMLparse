@@ -36,9 +36,6 @@ def setwise_match(source_root, target_root):
 	if source_size < target_size:
 		return False
 
-	global indent_count
-	indent_count += 1
-
 	# list children from each tree
 	src_childs = listify_children(source_root)
 	tgt_childs = listify_children(target_root)
@@ -61,22 +58,15 @@ def setwise_match(source_root, target_root):
 		# all target children require friends
 		# fail if too few potential friends remain
 		if not friend_found or source_size - j < target_size - (i + 1):
-			indent_count -= 1
 			return False
 
 	# all target children have found friends
-	indent_count -= 1
 	return True
 
 def match_structures(source_root, target_root):
 	global recursive_call_counter
-	global indent_count
-
 	recursive_call_counter += 1
-
-	print("  " * indent_count + target_root.tag)
-	smatch = setwise_match(source_root, target_root)
-	return (source_root.tag == target_root.tag) and smatch
+	return (source_root.tag == target_root.tag) and setwise_match(source_root, target_root)
 
 
 def get_root_from_arg(arg):
@@ -85,15 +75,35 @@ def get_root_from_arg(arg):
 	return ET.fromstring(arg)
 
 stindent = 0
-def showtree(root):
+def show_tree(root):
 	global stindent
 
 	print("  " * stindent + root.tag)
 
 	stindent += 1
 	for child in root:
-		showtree(child)
+		show_tree(child)
 	stindent -= 1
+
+# return a list of all first-order children of each element in the provided list
+def one_level_in(parent_list):
+	print("one level in")
+	children = []
+	for parent in parent_list:
+		for child in parent:
+			children.append(child)
+	return children
+
+def exhaustive_search(source_root, target_root):
+	parent_list = list(source_root)
+	while len(parent_list) > 0:
+		for parent in parent_list:
+			if match_structures(parent, target_root):
+				return True
+
+		parent_list = one_level_in(parent_list)
+
+	return False
 
 # --------------------------------- PROCEDURE ---------------------------------
 
@@ -104,45 +114,12 @@ if len(sys.argv) != 3:
 src_root = get_root_from_arg(sys.argv[1])
 tgt_root = get_root_from_arg(sys.argv[2])
 
-recursive_call_counter = 0
+print("seeking the following structure:")
+show_tree(tgt_root)
+print("")
 
 pre = ""
-if not match_structures(src_root, tgt_root):
-	pre = "non-"
+if not exhaustive_search(src_root, tgt_root):
+	pre += "non-"
 
 print(pre + "match determined in %d recursive calls" % recursive_call_counter)
-
-# -----------------------------------------------------------------------------
-
-# # parse XML from document
-# src_root = ET.parse(sys.argv[1]).getroot()
-
-# # parse XML from string
-# tgt_root = ET.fromstring(sys.argv[2])
-
-# # print(listify_children(tgt_root))
-# for child in listify_children(tgt_root):
-# 	print(child.tag)
-
-# -----------------------------------------------------------------------------
-
-# # test recursive match_structures/setwise_match recursion
-# source = "<a><b></b><b><c></c></b></a>"
-# target = "<a><b><c></c></b></a>"
-# print("should match")
-# print(match_structures(ET.fromstring(source), ET.fromstring(target)))
-
-# source = "<a><b></b><b><c></c></b></a>"
-# target = "<a><c><b></b></c></a>"
-# print("should not match")
-# print(match_structures(ET.fromstring(source), ET.fromstring(target)))
-
-# source = "<x></x>"
-# target = "<x></x>"
-# print("should match")
-# print(match_structures(ET.fromstring(source), ET.fromstring(target)))
-
-# source = "<a><b></b><b><c></c></b></a>"
-# target = "<a><b><c></c></b><d></d><e></e></a>"
-# print("should not match")
-# print(match_structures(ET.fromstring(source), ET.fromstring(target)))
