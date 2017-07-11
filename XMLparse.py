@@ -1,10 +1,10 @@
 #! /usr/bin/python3
 
-# parse a target structure and XML source to check if the target structure
-# is contained within the source
+# Parse a target structure and XML source to check if the target structure
+# is contained within the source. Print structural matches on separate lines.
 #
-# note: a "friend" is a child of a source node that matches (structurally)
-# a child of the target node
+# note: A "friend" is a child of a source node that matches (structurally)
+# a child of the target node.
 
 # ---------------------------------- IMPORTS ----------------------------------
 
@@ -156,24 +156,7 @@ if len(sys.argv) != 3:
 source_root = get_root_from_arg(sys.argv[1])
 target_root = get_root_from_arg(sys.argv[2])
 
-# show the "template" sought
-print("seeking the following structure:")
-show_tree(target_root)
-print()
-
 # obtain all matches present, then print each on its own line
 matches = exhaustive_search(source_root, target_root)
 for match in matches:
-	show_tree(match)
 	print(ET.tostring(match, encoding="UTF-8").decode())
-	print()
-
-# count the number of calls needed to find a match
-# bfs is likely superior in general - higher-level trees have
-# more structure to match
-pre = ""
-match_call_counter = 0
-if not exhaustive_match_bfs(source_root, target_root):
-	pre += "non-"
-
-print(pre + "match determined in %d match_structures() calls" % match_call_counter)
