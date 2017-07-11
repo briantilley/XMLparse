@@ -6,12 +6,13 @@
 # note: a "friend" is a child of a source node that matches (structurally)
 # a child of the target node
 
+# ---------------------------------- IMPORTS ----------------------------------
+
 import sys
 import re
 import xml.etree.ElementTree as ET
 
-recursive_call_counter = 0
-indent_count = 0
+# --------------------------------- FUNCTIONS ---------------------------------
 
 # return a list of subtrees of root
 def listify_children(root):
@@ -37,8 +38,8 @@ def setwise_match(source_root, target_root):
 		return False
 
 	# list children from each tree
-	src_childs = listify_children(source_root)
-	tgt_childs = listify_children(target_root)
+	source_children = listify_children(source_root)
+	target_children = listify_children(target_root)
 
 	# keep source nodes from being checked more than once
 	j = 0
@@ -49,7 +50,7 @@ def setwise_match(source_root, target_root):
 
 		# seek the first available friend
 		while j < source_size:
-			if match_structures(src_childs[j], tgt_childs[i]):
+			if match_structures(source_children[j], target_children[i]):
 				friend_found = True
 				j += 1
 				break
@@ -63,17 +64,36 @@ def setwise_match(source_root, target_root):
 	# all target children have found friends
 	return True
 
+# match root-level structure
+match_call_counter = 0
 def match_structures(source_root, target_root):
-	global recursive_call_counter
-	recursive_call_counter += 1
+	global match_call_counter
+	match_call_counter += 1
+
 	return (source_root.tag == target_root.tag) and setwise_match(source_root, target_root)
 
+# return a list of all first-order children of each element in the provided list
+def one_level_in(parent_list):
+	print("one level in")
+	children = []
+	for parent in parent_list:
+		for child in parent:
+			children.append(child)
+	return children
 
-def get_root_from_arg(arg):
-	if re.match(".*[.].*", arg):
-		return ET.parse(arg).getroot()
-	return ET.fromstring(arg)
+# seek target structure anywhere within the source
+def exhaustive_match(source_root, target_root):
+	parent_list = list(source_root)
+	while len(parent_list) > 0:
+		for parent in parent_list:
+			if match_structures(parent, target_root):
+				return True
 
+		parent_list = one_level_in(parent_list)
+
+	return False
+
+# print the tree given with indentation
 stindent = 0
 def show_tree(root):
 	global stindent
@@ -85,30 +105,16 @@ def show_tree(root):
 		show_tree(child)
 	stindent -= 1
 
-# return a list of all first-order children of each element in the provided list
-def one_level_in(parent_list):
-	print("one level in")
-	children = []
-	for parent in parent_list:
-		for child in parent:
-			children.append(child)
-	return children
-
-def exhaustive_search(source_root, target_root):
-	parent_list = list(source_root)
-	while len(parent_list) > 0:
-		for parent in parent_list:
-			if match_structures(parent, target_root):
-				return True
-
-		parent_list = one_level_in(parent_list)
-
-	return False
+# process argument and load XML from text
+def get_root_from_arg(arg):
+	if re.match(".*[.].*", arg):
+		return ET.parse(arg).getroot()
+	return ET.fromstring(arg)
 
 # --------------------------------- PROCEDURE ---------------------------------
 
 if len(sys.argv) != 3:
-	print("bad usage")
+	print("usage:", sys.argv[0], "source_XML target_structure")
 	sys.exit(1)
 
 src_root = get_root_from_arg(sys.argv[1])
@@ -116,10 +122,10 @@ tgt_root = get_root_from_arg(sys.argv[2])
 
 print("seeking the following structure:")
 show_tree(tgt_root)
-print("")
+print()
 
 pre = ""
-if not exhaustive_search(src_root, tgt_root):
+if not exhaustive_match(src_root, tgt_root):
 	pre += "non-"
 
-print(pre + "match determined in %d recursive calls" % recursive_call_counter)
+print(pre + "match determined in %d match_structures() calls" % match_call_counter)
