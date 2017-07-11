@@ -74,15 +74,14 @@ def match_structures(source_root, target_root):
 
 # return a list of all first-order children of each element in the provided list
 def one_level_in(parent_list):
-	print("one level in")
 	children = []
 	for parent in parent_list:
 		for child in parent:
 			children.append(child)
 	return children
 
-# seek target structure anywhere within the source
-def exhaustive_match(source_root, target_root):
+# (breadth-first) seek target structure anywhere within the source
+def exhaustive_match_bfs(source_root, target_root):
 	parent_list = list(source_root)
 	while len(parent_list) > 0:
 		for parent in parent_list:
@@ -92,6 +91,41 @@ def exhaustive_match(source_root, target_root):
 		parent_list = one_level_in(parent_list)
 
 	return False
+
+# (depth-first) seek target structure anywhere within the source
+def exhaustive_match(source_root, target_root):
+	if match_structures(source_root, target_root):
+		return True
+
+	for child in source_root:
+		if exhaustive_match(child, target_root):
+			return True
+
+	return False
+
+# (breadth-first) return the roots of all structures matching the target
+def exhaustive_search_bfs(source_root, target_root):
+	parent_list = list(source_root)
+	match_list = []
+
+	while len(parent_list) > 0:
+		for parent in parent_list:
+			if match_structures(parent, target_root):
+				match_list.append(parent)
+
+		parent_list = one_level_in(parent_list)
+
+	return match_list
+
+# (depth-first) return the roots of all structures matching the target
+def exhaustive_search(source_root, target_root, match_list=[]):
+	if match_structures(source_root, target_root):
+		match_list.append(source_root)
+
+	for child in source_root:
+		exhaustive_search(child, target_root, match_list)
+
+	return match_list
 
 # print the tree given with indentation
 stindent = 0
@@ -113,19 +147,33 @@ def get_root_from_arg(arg):
 
 # --------------------------------- PROCEDURE ---------------------------------
 
+# usage check
 if len(sys.argv) != 3:
 	print("usage:", sys.argv[0], "source_XML target_structure")
 	sys.exit(1)
 
-src_root = get_root_from_arg(sys.argv[1])
-tgt_root = get_root_from_arg(sys.argv[2])
+# obtain XML trees
+source_root = get_root_from_arg(sys.argv[1])
+target_root = get_root_from_arg(sys.argv[2])
 
+# show the "template" sought
 print("seeking the following structure:")
-show_tree(tgt_root)
+show_tree(target_root)
 print()
 
+# obtain all matches present, then print each on its own line
+matches = exhaustive_search(source_root, target_root)
+for match in matches:
+	show_tree(match)
+	print(ET.tostring(match, encoding="UTF-8").decode())
+	print()
+
+# count the number of calls needed to find a match
+# bfs is likely superior in general - higher-level trees have
+# more structure to match
 pre = ""
-if not exhaustive_match(src_root, tgt_root):
+match_call_counter = 0
+if not exhaustive_match_bfs(source_root, target_root):
 	pre += "non-"
 
 print(pre + "match determined in %d match_structures() calls" % match_call_counter)
