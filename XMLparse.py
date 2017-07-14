@@ -105,21 +105,21 @@ def one_level_in(parent_list):
 
 # (breadth-first or depth-first) seek target structure anywhere within the source
 def exhaustive_match(source_root, target_root, mode="bfs"):
-	if mode is "bfs":
+	if match_structures(source_root, target_root):
+			return True
+
+	if mode == "bfs":
 		parent_list = list(source_root)
 		while len(parent_list) > 0:
 			for parent in parent_list:
-				if match_structures(parent, target_root):
+				if match_structures(parent, target_root) == True:
 					return True
 
 			parent_list = one_level_in(parent_list)
 
-	elif mode is "dfs":
-		if match_structures(source_root, target_root):
-			return True
-
+	elif mode == "dfs":
 		for child in source_root:
-			if exhaustive_match(child, target_root, "dfs"):
+			if exhaustive_match(child, target_root, "dfs") == True:
 				return True
 
 	return False
@@ -162,7 +162,7 @@ def trim_branches(matched_root, target_root):
 def search(source_root, target_root, strict=False, mode= "dfs"):
 	if mode == "dfs":
 		if match_structures(source_root, target_root):
-			if strict:
+			if strict is True:
 				return trim_branches(source_root, target_root)
 			else:
 				return source_root
@@ -170,7 +170,7 @@ def search(source_root, target_root, strict=False, mode= "dfs"):
 		for child in source_root:
 			r = search(child, target_root, "dfs")
 			if r:
-				if strict:
+				if strict is True:
 					return(trim_branches(r, target_root))
 				else:
 					return r
@@ -181,7 +181,7 @@ def search(source_root, target_root, strict=False, mode= "dfs"):
 		while len(parent_list) > 0:
 			for parent in parent_list:
 				if match_structures(parent, target_root):
-					if strict:
+					if strict is True:
 						return trim_branches(parent, target_root)
 					else:
 						return parent
@@ -191,10 +191,13 @@ def search(source_root, target_root, strict=False, mode= "dfs"):
 	return None
 
 # (breadth-first or depth-first) return the roots of all structures matching the target
-def exhaustive_search(source_root, target_root, strict=False, mode= "dfs", match_list=[]):
+def exhaustive_search(source_root, target_root, strict=False, mode= "dfs", match_list=None):
+	if match_list is None:
+		match_list = []
+
 	if mode == "dfs":
 		if match_structures(source_root, target_root):
-			if strict:
+			if strict is True:
 				match_list.append(trim_branches(source_root, target_root))
 			else:
 				match_list.append(source_root)
@@ -208,7 +211,7 @@ def exhaustive_search(source_root, target_root, strict=False, mode= "dfs", match
 		while len(parent_list) > 0:
 			for parent in parent_list:
 				if match_structures(parent, target_root):
-					if strict:
+					if strict is True:
 						match_list.append(trim_branches(parent, target_root))
 					else:
 						match_list.append(parent)
@@ -238,6 +241,21 @@ def get_root_from_arg(arg):
 # return the XML text equivalent of a tree
 def get_source(node):
 	return minidom.parseString(et.tostring(node, encoding="UTF-8").decode()).toprettyxml()
+
+def attribs_to_string(attribs):
+	string = ""
+	for attr, val in attribs.items():
+		string += " %s=\"%s\"" % (attr, val)
+	return string
+
+def get_source_tags(node, level=0):
+	tag = re.search(r"\w*$", node.tag).group()
+	source = "    " * level + "<" + tag + attribs_to_string(node.attrib) + ">\n"
+	for child in node:
+		source += get_source_tags(child, level + 1) + "\n"
+
+	source += "    " * level + "</%s>" % tag
+	return source
 
 # --------------------------------- PROCEDURE ---------------------------------
 
